@@ -26,6 +26,10 @@
 <article class="alert success">
   <strong>Success!</strong> Repository settings updated.
 </article>
+{{ else if eq .Status "delete_repo_success" }}
+<article class="alert success">
+  <strong>Success!</strong> Repository deleted.
+</article>
 {{ else if eq .Status "username_exists" }}
 <article class="alert error">
   <strong>Oops.</strong> The username you entered already exists.

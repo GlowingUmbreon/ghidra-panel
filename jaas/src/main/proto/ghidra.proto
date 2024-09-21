@@ -11,14 +11,15 @@ import "google/protobuf/empty.proto";
 
 service Ghidra {
   rpc GetVersion(google.protobuf.Empty) returns (Version) {}
-  rpc GetRepositoriesAndUsers(google.protobuf.Empty) returns (GetRepositoriesAndUsersReply) {}
   rpc GetRepositories(google.protobuf.Empty) returns (GetRepositoriesReply) {}
+  rpc GetRepository(GetRepositoryRequest) returns (GetRepositoryReply) {}
   rpc GetRepositoryUser(GetRepositoryUserRequest) returns (GetRepositoryUserReply) {}
   rpc GetUsers(google.protobuf.Empty) returns (GetUsersReply) {}
   rpc AddUser(AddUserRequest) returns (google.protobuf.Empty) {}
   rpc RemoveUser(RemoveUserRequest) returns (google.protobuf.Empty) {}
   rpc SetUserPermission(SetUserPermissionRequest) returns (google.protobuf.Empty) {}
   rpc AuthenticateUser(AuthenticateUserRequest) returns (AuthenticateUserReply) {}
+  rpc DeleteRepository(DeleteRepositoryRequest) returns (google.protobuf.Empty) {}
 }
 
 message Version {
@@ -50,16 +51,22 @@ message Repository {
   repeated UserWithPermission users = 4;
 }
 
-message GetRepositoriesAndUsersReply {
+message GetRepositoriesReply {
   Version version = 1;
   string repositoriesDir = 2;
   repeated Repository repositories = 3;
   repeated User users = 4;
 }
 
-message GetRepositoriesReply {
-  string repositoriesDir = 1;
-  repeated Repository repositories = 2;
+message GetRepositoryRequest {
+  string repository = 1;
+}
+
+message GetRepositoryReply {
+  Version version = 1;
+  string repositoriesDir = 2;
+  Repository repository = 3;
+  repeated User users = 4;
 }
 
 message GetRepositoryUserRequest {
@@ -104,4 +111,8 @@ message AuthenticateUserReply {
   string username = 2;
   // If success is false, this will contain the reason
   string message = 3;
+}
+
+message DeleteRepositoryRequest {
+  string repository = 1;
 }

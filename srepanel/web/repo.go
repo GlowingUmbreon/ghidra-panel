@@ -18,6 +18,7 @@ type RepoState struct {
 	StatusUser string
 	QueryUser  string
 	QueryRole  string
+	CanDelete  bool
 }
 
 func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
@@ -35,6 +36,7 @@ func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
 	if !s.authenticateState(wr, req, state.State) {
 		return
 	}
+	isSuperAdmin := slices.Contains(s.Config.SuperAdmins, state.Identity.ID)
 
 	// Fetch repository information from the database
 	info, err := s.DB.GetRepository(req.Context(), repoName)
@@ -46,7 +48,7 @@ func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
 	state.Repo = info
 
 	// Fetch repository and user information from Ghidra
-	reply, err := s.Client.GetRepositoriesAndUsers(req.Context(), &emptypb.Empty{})
+	reply, err := s.Client.GetRepositories(req.Context(), &emptypb.Empty{})
 	if err != nil {
 		log.Print("Failed to fetch repositories:", err)
 		s.renderError(wr, http.StatusInternalServerError, "Failed to fetch repositories.", state.State)
@@ -67,7 +69,7 @@ func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
 	}
 
 	// Ensure current user has admin access to the repository
-	isAdmin := slices.Contains(s.Config.SuperAdmins, state.Identity.ID)
+	isAdmin := isSuperAdmin
 	if !isAdmin {
 		for _, u := range repo.Users {
 			if u.User.Username == state.UserState.Username && u.Permission == ghidra.Permission_ADMIN {
@@ -80,6 +82,9 @@ func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
 		http.Error(wr, "Not authorized", http.StatusUnauthorized)
 		return
 	}
+
+	// Repository can be deleted if the user is a super admin, or if the user is the only admin
+	state.CanDelete = isSuperAdmin || len(repo.Users) == 1
 
 	// Query for repository access
 	state.ACL = make([]common.RepoUserAccessDisplay, 0)

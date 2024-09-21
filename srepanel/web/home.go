@@ -33,7 +33,7 @@ func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
 	state.SuperAdmin = slices.Contains(s.Config.SuperAdmins, state.Identity.ID)
 
 	// Fetch repository and user information from Ghidra
-	reply, err := s.Client.GetRepositoriesAndUsers(req.Context(), &emptypb.Empty{})
+	reply, err := s.Client.GetRepositories(req.Context(), &emptypb.Empty{})
 	if err != nil {
 		log.Println("Failed to fetch repositories:", err)
 		s.renderError(wr, http.StatusInternalServerError, "Failed to fetch repositories.", state.State)

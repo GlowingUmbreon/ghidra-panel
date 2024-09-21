@@ -18,6 +18,9 @@ public class RepositorySupport {
   private static MethodHandle removeUser;
   private static MethodHandle getRootFolder;
   private static MethodHandle getFileSystem;
+  private static MethodHandle getValid;
+  private static MethodHandle setValid;
+  private static MethodHandle dispose;
 
   public static User[] getRepositoryUsers(Repository repository) {
     if (getUserMap == null) {
@@ -111,6 +114,65 @@ public class RepositorySupport {
       return (LocalFileSystem) getFileSystem.invokeExact(repository);
     } catch (Throwable e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  public static boolean getValid(Repository repository) {
+    if (getValid == null) {
+      try {
+        Field field = Repository.class.getDeclaredField("valid");
+        field.setAccessible(true);
+        getValid = MethodHandles.lookup().unreflectGetter(field);
+      } catch (NoSuchFieldException | IllegalAccessException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    try {
+      return (boolean) getValid.invokeExact(repository);
+    } catch (Throwable e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static void setValid(Repository repository, boolean valid) {
+    if (setValid == null) {
+      try {
+        Field field = Repository.class.getDeclaredField("valid");
+        field.setAccessible(true);
+        setValid = MethodHandles.lookup().unreflectSetter(field);
+      } catch (NoSuchFieldException | IllegalAccessException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    try {
+      setValid.invokeExact(repository, valid);
+    } catch (Throwable e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static void deleteRepository(Repository repository) {
+    // There's a delete method in Repository, but it's unimplemented
+    // We'll implement it ourselves by setting the valid flag and calling dispose
+    if (dispose == null) {
+      try {
+        Method method = Repository.class.getDeclaredMethod("dispose");
+        method.setAccessible(true);
+        dispose = MethodHandles.lookup().unreflect(method);
+      } catch (NoSuchMethodException | IllegalAccessException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    synchronized (repository.getSyncObject()) {
+      if (!getValid(repository)) {
+        throw new RuntimeException("Repository already deleted");
+      }
+      setValid(repository, false);
+      try {
+        dispose.invokeExact(repository);
+      } catch (Throwable e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 }

@@ -96,6 +96,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /request_access", s.handleRequestAccess)
 	mux.HandleFunc("POST /set_user_access", s.handleSetUserAccess)
 	mux.HandleFunc("POST /update_repo", s.handleUpdateRepo)
+	mux.HandleFunc("POST /delete_repo", s.handleDeleteRepo)
 
 	// Create file server for assets
 	mux.Handle("GET /assets/", http.FileServer(http.FS(assets)))

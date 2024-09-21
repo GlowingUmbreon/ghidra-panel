@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Ghidra Panel - Repo</title>
+    <title>Ghidra Panel - {{ .Repo.Name }}</title>
     {{ template "head.gohtml" }}
 </head>
 <body>
@@ -90,6 +90,19 @@
                 <button role="button" type="submit" class="outline">Update</button>
             </form>
         </article>
+        {{ if .CanDelete }}
+        <article>
+            <header>
+                <strong>Delete Repository</strong>
+            </header>
+            <form action="/delete_repo" method="post">
+                <input type="hidden" name="repo" value="{{ .Repo.Name }}">
+                <label for="confirm">Confirm</label>
+                <input type="text" id="confirm" name="confirm" placeholder="Enter repository name to confirm">
+                <button role="button" type="submit" class="outline">Delete</button>
+            </form>
+        </article>
+        {{ end }}
         </div>
     </div>
 </main>

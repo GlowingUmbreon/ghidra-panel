@@ -8,6 +8,8 @@ import ghidra.server.UserManager;
 import ghidra.server.remote.GhidraServer;
 import ghidra.util.exception.DuplicateNameException;
 import io.grpc.stub.StreamObserver;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import re.mkw.srejaas.proto.*;
 import re.mkw.srejaas.reflect.GhidraServerSupport;
 import re.mkw.srejaas.reflect.LocalFileSystemSupport;
@@ -22,11 +24,13 @@ import java.util.Arrays;
 public class GrpcImpl extends GhidraGrpc.GhidraImplBase {
   private final RepositoryManager repositoryManager;
   private final UserManager userManager;
+  private final Logger log;
 
   public GrpcImpl() {
     GhidraServer ghidraServer = GhidraServerSupport.getGhidraServer();
     repositoryManager = GhidraServerSupport.getRepositoryManager(ghidraServer);
     userManager = repositoryManager.getUserManager();
+    log = LogManager.getLogger(GrpcImpl.class);
   }
 
   @Override
@@ -36,9 +40,9 @@ public class GrpcImpl extends GhidraGrpc.GhidraImplBase {
   }
 
   @Override
-  public void getRepositoriesAndUsers(Empty request, StreamObserver<GetRepositoriesAndUsersReply> responseObserver) {
+  public void getRepositories(Empty request, StreamObserver<GetRepositoriesReply> responseObserver) {
     String repositoriesDir = RepositoryManagerSupport.getRootDir(repositoryManager).getAbsolutePath();
-    GetRepositoriesAndUsersReply.Builder builder = GetRepositoriesAndUsersReply.newBuilder()
+    GetRepositoriesReply.Builder builder = GetRepositoriesReply.newBuilder()
         .setVersion(buildVersion())
         .setRepositoriesDir(repositoriesDir);
     for (String name : RepositoryManagerSupport.getRepositoryNames(repositoryManager)) {
@@ -53,12 +57,17 @@ public class GrpcImpl extends GhidraGrpc.GhidraImplBase {
   }
 
   @Override
-  public void getRepositories(Empty request, StreamObserver<GetRepositoriesReply> responseObserver) {
+  public void getRepository(GetRepositoryRequest request, StreamObserver<GetRepositoryReply> responseObserver) {
     String repositoriesDir = RepositoryManagerSupport.getRootDir(repositoryManager).getAbsolutePath();
-    GetRepositoriesReply.Builder builder = GetRepositoriesReply.newBuilder().setRepositoriesDir(repositoriesDir);
-    for (String name : RepositoryManagerSupport.getRepositoryNames(repositoryManager)) {
-      ghidra.server.Repository repository = RepositoryManagerSupport.getRepository(repositoryManager, name);
-      builder.addRepositories(buildRepository(repository));
+    GetRepositoryReply.Builder builder = GetRepositoryReply.newBuilder()
+        .setVersion(buildVersion())
+        .setRepositoriesDir(repositoriesDir);
+    ghidra.server.Repository repository = RepositoryManagerSupport.getRepository(repositoryManager, request.getRepository());
+    if (repository != null) {
+      builder.setRepository(buildRepository(repository));
+    }
+    for (String user : userManager.getUsers()) {
+      builder.addUsers(buildUser(user));
     }
     responseObserver.onNext(builder.build());
     responseObserver.onCompleted();
@@ -92,6 +101,7 @@ public class GrpcImpl extends GhidraGrpc.GhidraImplBase {
 
   @Override
   public void addUser(AddUserRequest request, StreamObserver<Empty> responseObserver) {
+    log.info("Adding user: {}", request.getUsername());
     try {
       userManager.addUser(request.getUsername());
       responseObserver.onNext(Empty.getDefaultInstance());
@@ -105,6 +115,7 @@ public class GrpcImpl extends GhidraGrpc.GhidraImplBase {
 
   @Override
   public void removeUser(RemoveUserRequest request, StreamObserver<Empty> responseObserver) {
+    log.info("Removing user: {}", request.getUsername());
     try {
       if (userManager.removeUser(request.getUsername())) {
         responseObserver.onNext(Empty.getDefaultInstance());
@@ -119,6 +130,7 @@ public class GrpcImpl extends GhidraGrpc.GhidraImplBase {
 
   @Override
   public void setUserPermission(SetUserPermissionRequest request, StreamObserver<Empty> responseObserver) {
+    log.info("Setting user permission: {} {} {}", request.getUsername(), request.getRepository(), request.getPermission());
     try {
       ghidra.server.Repository repository = RepositoryManagerSupport.getRepository(repositoryManager, request.getRepository());
       if (repository == null) {
@@ -179,6 +191,18 @@ public class GrpcImpl extends GhidraGrpc.GhidraImplBase {
     } catch (IOException e) {
       responseObserver.onError(io.grpc.Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
     }
+  }
+
+  @Override
+  public void deleteRepository(DeleteRepositoryRequest request, StreamObserver<Empty> responseObserver) {
+    log.warn("Deleting repository: {}", request.getRepository());
+    try {
+      RepositoryManagerSupport.deleteRepository(repositoryManager, request.getRepository());
+    } catch (IOException e) {
+      responseObserver.onError(io.grpc.Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
+    }
+    responseObserver.onNext(Empty.getDefaultInstance());
+    responseObserver.onCompleted();
   }
 
   private Version buildVersion() {

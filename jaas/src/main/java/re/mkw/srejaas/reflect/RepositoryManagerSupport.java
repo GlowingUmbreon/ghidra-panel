@@ -2,16 +2,23 @@ package re.mkw.srejaas.reflect;
 
 import ghidra.server.Repository;
 import ghidra.server.RepositoryManager;
+import ghidra.util.NamingUtilities;
+import utilities.util.FileUtilities;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
 
 public class RepositoryManagerSupport {
   private static MethodHandle getRootDir;
   private static MethodHandle getRepository;
   private static MethodHandle getRepositoryNames;
+  private static MethodHandle getRepositoryMap;
 
   public static File getRootDir(RepositoryManager mgr) {
     if (getRootDir == null) {
@@ -61,6 +68,40 @@ public class RepositoryManagerSupport {
       return (String[]) getRepositoryNames.invokeExact(mgr);
     } catch (Throwable e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  public static Map<String, Repository> getRepositoryMap(RepositoryManager mgr) {
+    if (getRepositoryMap == null) {
+      try {
+        Field field = RepositoryManager.class.getDeclaredField("repositoryMap");
+        field.setAccessible(true);
+        getRepositoryMap = MethodHandles.lookup().unreflectGetter(field);
+      } catch (NoSuchFieldException | IllegalAccessException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    try {
+      return (HashMap<String, Repository>) getRepositoryMap.invokeExact(mgr);
+    } catch (Throwable e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static void deleteRepository(RepositoryManager mgr, String name) throws IOException {
+    synchronized (mgr) {
+      Map<String, Repository> repositoryMap = getRepositoryMap(mgr);
+      Repository repository = repositoryMap.get(name);
+      if (repository != null) {
+        RepositorySupport.deleteRepository(repository);
+        File rootDir = getRootDir(mgr);
+        File f = new File(rootDir, NamingUtilities.mangle(name));
+        if (!FileUtilities.deleteDir(f)) {
+          throw new IOException("Failed to remove directory for " + f.getAbsolutePath());
+        } else {
+          repositoryMap.remove(name);
+        }
+      }
     }
   }
 }
